@@ -1,0 +1,215 @@
+# Data Collection and Analytics System
+#
+#   browser -> enter-data  --\                      /--> mysql  <-- analytics --> mongo <-- show-results <- browser
+#   browser -> show-results --+--> auth (verify) --/
+#
+# Networks
+#   frontend : only the two web apps; this is how their ports reach the host
+#   backend  : internal-only (no host access, no outbound internet);
+#              mysql, mongo, auth and analytics live ONLY here
+#
+# Start:  cp .env.example .env   (fill in values)   then   docker compose up -d --build
+
+name: analytics-system
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-hardening: &hardening
+  restart: unless-stopped
+  logging: *default-logging
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  read_only: true
+  tmpfs: ["/tmp"]
+
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in .env}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-analytics_db}
+      AUTH_DB_USER: ${AUTH_DB_USER:?set AUTH_DB_USER in .env}
+      AUTH_DB_PASSWORD: ${AUTH_DB_PASSWORD:?set AUTH_DB_PASSWORD in .env}
+      ENTER_DB_USER: ${ENTER_DB_USER:?set ENTER_DB_USER in .env}
+      ENTER_DB_PASSWORD: ${ENTER_DB_PASSWORD:?set ENTER_DB_PASSWORD in .env}
+      ANALYTICS_DB_USER: ${ANALYTICS_DB_USER:?set ANALYTICS_DB_USER in .env}
+      ANALYTICS_DB_PASSWORD: ${ANALYTICS_DB_PASSWORD:?set ANALYTICS_DB_PASSWORD in .env}
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./db/mysql/init.sh:/docker-entrypoint-initdb.d/10-init.sh:ro
+    networks: [backend]
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 768M # MySQL 8 idles around 400-500 MB; headroom for the load test
+
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER:?set MONGO_ROOT_USER in .env}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:?set MONGO_ROOT_PASSWORD in .env}
+      MONGO_DB: ${MONGO_DB:-analytics}
+      MONGO_WRITER_USER: ${MONGO_WRITER_USER:?set MONGO_WRITER_USER in .env}
+      MONGO_WRITER_PASSWORD: ${MONGO_WRITER_PASSWORD:?set MONGO_WRITER_PASSWORD in .env}
+      MONGO_READER_USER: ${MONGO_READER_USER:?set MONGO_READER_USER in .env}
+      MONGO_READER_PASSWORD: ${MONGO_READER_PASSWORD:?set MONGO_READER_PASSWORD in .env}
+    volumes:
+      - mongo_data:/data/db
+      - ./db/mongo/init.sh:/docker-entrypoint-initdb.d/10-init.sh:ro
+    networks: [backend]
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M # only a handful of small stats documents; WiredTiger cache is capped by the limit
+
+  auth:
+    <<: *hardening
+    build: ./services/auth
+    environment:
+      PORT: "4000"
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+      DB_HOST: mysql
+      DB_NAME: ${MYSQL_DATABASE:-analytics_db}
+      DB_USER: ${AUTH_DB_USER}
+      DB_PASSWORD: ${AUTH_DB_PASSWORD}
+      SEED_USERNAME: ${SEED_USERNAME:?set SEED_USERNAME in .env}
+      SEED_PASSWORD: ${SEED_PASSWORD:?set SEED_PASSWORD in .env}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks: [backend]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:4000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 4
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 128M # tiny stateless service; bcrypt is the only CPU spike
+
+  enter-data:
+    <<: *hardening
+    build: ./services/enter-data
+    ports:
+      - "8081:3000"
+    environment:
+      PORT: "3000"
+      AUTH_URL: http://auth:4000
+      DB_HOST: mysql
+      DB_NAME: ${MYSQL_DATABASE:-analytics_db}
+      DB_USER: ${ENTER_DB_USER}
+      DB_PASSWORD: ${ENTER_DB_PASSWORD}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      auth:
+        condition: service_healthy
+    networks: [frontend, backend]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 4
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 192M # request path is one auth call plus one INSERT
+
+  analytics:
+    <<: *hardening
+    build: ./services/analytics
+    environment:
+      DB_HOST: mysql
+      DB_NAME: ${MYSQL_DATABASE:-analytics_db}
+      DB_USER: ${ANALYTICS_DB_USER}
+      DB_PASSWORD: ${ANALYTICS_DB_PASSWORD}
+      MONGO_HOST: mongo
+      MONGO_DB: ${MONGO_DB:-analytics}
+      MONGO_USER: ${MONGO_WRITER_USER}
+      MONGO_PASSWORD: ${MONGO_WRITER_PASSWORD}
+      ANALYTICS_INTERVAL_SECONDS: ${ANALYTICS_INTERVAL_SECONDS:-30}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+    networks: [backend]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health', timeout=3).status == 200 else 1)"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M # periodic batch job: three aggregate queries every interval, not latency-sensitive
+
+  show-results:
+    <<: *hardening
+    build: ./services/show-results
+    ports:
+      - "8082:3000"
+    environment:
+      PORT: "3000"
+      AUTH_URL: http://auth:4000
+      MONGO_HOST: mongo
+      MONGO_DB: ${MONGO_DB:-analytics}
+      MONGO_USER: ${MONGO_READER_USER}
+      MONGO_PASSWORD: ${MONGO_READER_PASSWORD}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+    depends_on:
+      mongo:
+        condition: service_healthy
+      auth:
+        condition: service_healthy
+    networks: [frontend, backend]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 4
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 192M # request path is one auth call plus one small Mongo read
+
+networks:
+  frontend: {}
+  backend:
+    internal: true
+
+volumes:
+  mysql_data:
+  mongo_data:

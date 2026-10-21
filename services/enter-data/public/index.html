@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Enter Data</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <main>
+    <h1>Enter Data</h1>
+
+    <section id="login-view" hidden>
+      <form id="login-form" autocomplete="on">
+        <label>Username <input name="username" required maxlength="50" autocomplete="username"></label>
+        <label>Password <input name="password" type="password" required maxlength="128" autocomplete="current-password"></label>
+        <button type="submit">Log in</button>
+      </form>
+    </section>
+
+    <section id="data-view" hidden>
+      <p class="who">Signed in as <strong id="who"></strong> <button id="logout" class="link" type="button">Log out</button></p>
+      <form id="data-form">
+        <label>Value <input name="value" inputmode="decimal" required placeholder="e.g. 21.5"></label>
+        <button type="submit">Submit</button>
+      </form>
+      <h2>Your last 10 entries</h2>
+      <table>
+        <thead><tr><th>ID</th><th>Value</th><th>Time</th></tr></thead>
+        <tbody id="recent"></tbody>
+      </table>
+    </section>
+
+    <p id="message" role="status"></p>
+  </main>
+  <script src="/app.js"></script>
+</body>
+</html>
