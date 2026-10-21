@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Show Results</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <main>
+    <h1>Analytics Results</h1>
+
+    <section id="login-view" hidden>
+      <form id="login-form" autocomplete="on">
+        <label>Username <input name="username" required maxlength="50" autocomplete="username"></label>
+        <label>Password <input name="password" type="password" required maxlength="128" autocomplete="current-password"></label>
+        <button type="submit">Log in</button>
+      </form>
+    </section>
+
+    <section id="results-view" hidden>
+      <p class="who">Signed in as <strong id="who"></strong> <button id="logout" class="link" type="button">Log out</button></p>
+
+      <h2>Overall</h2>
+      <table>
+        <thead><tr><th>Count</th><th>Min</th><th>Max</th><th>Average</th></tr></thead>
+        <tbody id="overall"></tbody>
+      </table>
+
+      <h2>By user</h2>
+      <table>
+        <thead><tr><th>User</th><th>Count</th><th>Min</th><th>Max</th><th>Average</th></tr></thead>
+        <tbody id="users"></tbody>
+      </table>
+
+      <p id="updated" class="muted"></p>
+    </section>
+
+    <p id="message" role="status"></p>
+  </main>
+  <script src="/app.js"></script>
+</body>
+</html>

@@ -1,1 +1,18 @@
+# Secrets: never commit the real .env
 .env
+.env.*
+!.env.example
+
+# Dependencies and build output
+node_modules/
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

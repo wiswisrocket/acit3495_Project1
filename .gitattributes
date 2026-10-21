@@ -1,0 +1,6 @@
+# Keep LF line endings for files that run inside Linux containers.
+# Without this, Git on Windows can convert them to CRLF and break the init scripts.
+* text=auto
+*.sh text eol=lf
+Dockerfile text eol=lf
+*.yml text eol=lf
