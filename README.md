@@ -2,7 +2,14 @@
 
 A containerized microservices system. Authenticated users enter numeric data, a background service computes statistics (count, min, max, average), and a second web app shows the results.
 
-**Team:** TODO (names and which services each person owns)
+**The Team:**
+
+| Student | GitHub Username | Service Owned |
+| --- | --- | --- |
+| Luis Labao | @wiswisrocket | TODO |
+| Joshua Domino | @joshdomino | TODO |
+| Michael Mehram | @Dawningg | TODO |
+| Katrina de Guzman | @katrinadeguzman | TODO |
 
 ## Architecture
 
