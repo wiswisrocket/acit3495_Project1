@@ -170,7 +170,7 @@ TODO: the team fills these in after measuring the running system. Link the full 
 | Failure tests (which services were stopped, what users saw, how it recovered) | TODO |
 | Load test (throughput, errors, CPU, memory; two improvements compared with the baseline) | TODO |
 | Persistence (data after recreating a database container) | TODO |
-| Successful CI run (link) | ![ci result: success](docs\screenshots\ci_success.png) |
+| Successful CI run (link) | ![ci result: success](docs/screenshots/ci_success.png) |
 
 ## AI assistance
 
