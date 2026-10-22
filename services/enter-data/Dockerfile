@@ -12,6 +12,7 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY package.json ./
 COPY src ./src
 COPY public ./public
+RUN apk upgrade --no-cache libcrypto3 libssl3
 USER node
 EXPOSE 3000
 CMD ["node", "src/server.js"]

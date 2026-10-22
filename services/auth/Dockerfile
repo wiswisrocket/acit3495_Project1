@@ -11,6 +11,7 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY package.json ./
 COPY src ./src
+RUN apk upgrade --no-cache libcrypto3 libssl3
 USER node
 EXPOSE 4000
 CMD ["node", "src/server.js"]
