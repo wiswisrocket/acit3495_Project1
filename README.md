@@ -4,12 +4,12 @@ A containerized microservices system. Authenticated users enter numeric data, a 
 
 **The Team:**
 
-| Student | GitHub Username | Service Owned |
+| Student | GitHub Username |
 | --- | --- | --- |
-| Luis Labao | @wiswisrocket | TODO |
-| Joshua Domino | @joshdomino | TODO |
-| Michael Mehram | @Dawningg | TODO |
-| Katrina de Guzman | @katrinadeguzman | TODO |
+| Luis Labao | @wiswisrocket |
+| Joshua Domino | @joshdomino |
+| Michael Mehram | @Dawningg |
+| Katrina de Guzman | @katrinadeguzman |
 
 ## Architecture
 
