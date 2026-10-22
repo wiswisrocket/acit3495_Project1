@@ -38,13 +38,24 @@ function createAuthClient(authUrl, timeoutMs = 3000) {
   };
 }
 
-function requireAuth(authClient) {
+function requireAuth(authClient, ttlMs = Number(process.env.VERIFY_CACHE_MS || 5000)) {
+  const cache = new Map(); // token -> { username, expires }; only successful checks are cached
   return async (req, res, next) => {
     const token = req.cookies && req.cookies[COOKIE_NAME];
     if (!token || typeof token !== 'string') return res.status(401).json({ error: 'not logged in' });
+
+    const hit = cache.get(token);
+    if (hit && hit.expires > Date.now()) {
+      req.user = hit.username;
+      return next();
+    }
+
     const result = await authClient.verify(token);
     if (result.status === 401) return res.status(401).json({ error: 'not logged in' });
     if (result.status !== 200) return res.status(503).json({ error: 'authentication service unavailable' });
+
+    if (cache.size > 10000) cache.clear(); // keep memory bounded
+    cache.set(token, { username: result.username, expires: Date.now() + ttlMs });
     req.user = result.username;
     return next();
   };
